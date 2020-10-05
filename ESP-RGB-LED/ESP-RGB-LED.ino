@@ -28,6 +28,15 @@ const int redChannel = 0;
 const int greenChannel = 1;
 const int blueChannel = 2;
 
+const int ldrThreshold = 500;
+const int touchThreshold = 40;
+bool overrideFlag = false;
+
+unsigned long currentMillis = 0;
+unsigned long previousMillis = 0;
+unsigned long touch0Millis = 0;
+unsigned long touch3Millis = 0;
+
 void setup() {
 	Serial.begin(115200);
 
@@ -64,19 +73,57 @@ void setup() {
 }
 
 void loop() {
-	struct tm timeinfo;
-	if(!getLocalTime(&timeinfo)) {
-		Serial.println("Failed to obtain time");
+	currentMillis = millis();
+	if(touchRead(T0) < touchThreshold) {
+		if(touch0Millis == 0) {
+			touch0Millis = currentMillis;
+		}
+
+		if((currentMillis-touch0Millis) >= 10) {
+			overrideFlag = false;
+		}
 	}
-//	Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
+	else {
+		touch0Millis = 0;
+	}
 
-	setColorFromHour(timeinfo.tm_hour);
-	fadeColor();
+	if(touchRead(T3) < touchThreshold) {
+		if(touch3Millis == 0) {
+			touch3Millis = currentMillis;
+		}
 
-	delay(1000);
+		if((currentMillis-touch3Millis) >= 10) {
+			overrideFlag = true;
+		}
+	}
+	else {
+		touch3Millis = 0;
+	}
+
+	if(currentMillis - previousMillis >= 100) {
+		struct tm timeinfo;
+		if(!getLocalTime(&timeinfo)) {
+			Serial.println("Failed to obtain time");
+		}
+//		Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
+		setColorFromHour(timeinfo.tm_hour);
+		fadeColor();
+		
+	  previousMillis = currentMillis;
+	}
 }
 
 void setColorFromHour(int h) {
+//	if (overrideFlag) { // buggy.. hard to switch off
+//		targetColor = {255, 255, 255};
+//		return;
+//	}
+
+	if(analogRead(36) > ldrThreshold) { // light is on
+		targetColor = {0, 0, 0};
+		return;
+	}
+
 	switch(h) {
 		case 0 ... 6: // midnight to 6am
 			targetColor = {180, 0, 0};
@@ -89,6 +136,27 @@ void setColorFromHour(int h) {
 			break;
 		case 9:
 			targetColor = {150, 25, 150};
+			break;
+		case 10:
+			targetColor = {100, 50, 175};
+			break;
+		case 11:
+			targetColor = {50, 50, 200};
+			break;
+		case 12:
+			targetColor = {0, 0, 225};
+			break;
+		case 13:
+			targetColor = {0, 100, 225};
+			break;
+		case 14:
+			targetColor = {0, 170, 160};
+			break;
+		case 15:
+			targetColor = {2, 175, 76};
+			break;
+		case 16:
+			targetColor = {95, 200, 70};
 			break;
 		case 17:
 			targetColor = {200, 200, 0};
