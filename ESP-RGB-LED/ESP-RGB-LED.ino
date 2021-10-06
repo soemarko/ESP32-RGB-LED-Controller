@@ -1,5 +1,6 @@
 #include <WiFi.h>
 #include "time.h"
+#include "RGBConverter.h"
 
 struct Color {
 	int red;
@@ -10,8 +11,12 @@ struct Color {
 Color currentColor = {0, 0, 0};
 Color targetColor = {0, 0, 0};
 
-const char* ssid = "ssid";
-const char* password = "password";
+RGBConverter colorConverter;
+int lastChangedHour = -1;
+
+//const char* ssid = "ssid";
+//const char* password = "password";
+#include "wificreds.h" // create wificreds.h and use above as the content with your ssid and password
 
 const char* ntpServer = "pool.ntp.org";
 const long  gmtOffset_sec = 7 * 3600; // GMT+7
@@ -37,8 +42,19 @@ unsigned long previousMillis = 0;
 unsigned long touch0Millis = 0;
 unsigned long touch3Millis = 0;
 
+void randomizedColor(double lit = 0.75) {
+	uint8_t rgb[2];
+	double hue = random(10001) / 10000.0;
+	double sat = random(750, 1000) / 1000.0;
+
+	colorConverter.hslToRgb(hue, sat, lit, rgb);
+
+	targetColor = {rgb[0], rgb[1], rgb[2]};
+}
+
 void setup() {
 	Serial.begin(115200);
+	randomSeed(analogRead(0));
 
 	// configure LED PWM functionalitites
 	ledcSetup(redChannel, freq, resolution);
@@ -121,6 +137,11 @@ void setColorFromHour(int h) {
 
 	if(analogRead(36) > ldrThreshold) { // light is on
 		targetColor = {0, 0, 0};
+		lastChangedHour = -1;
+		return;
+	}
+
+	if(lastChangedHour == h) {
 		return;
 	}
 
@@ -128,62 +149,22 @@ void setColorFromHour(int h) {
 		case 0 ... 6: // midnight to 6am
 			targetColor = {180, 0, 0};
 			break;
-		case 7:
-			targetColor = {225, 50, 50};
+		case 7 ... 14:
+			randomizedColor(1.0); // full brightness
 			break;
-		case 8:
-			targetColor = {175, 0, 100};
-			break;
-		case 9:
-			targetColor = {150, 25, 150};
-			break;
-		case 10:
-			targetColor = {100, 50, 175};
-			break;
-		case 11:
-			targetColor = {50, 50, 200};
-			break;
-		case 12:
-			targetColor = {0, 0, 225};
-			break;
-		case 13:
-			targetColor = {0, 100, 225};
-			break;
-		case 14:
-			targetColor = {0, 170, 160};
-			break;
-		case 15:
-			targetColor = {2, 175, 76};
-			break;
-		case 16:
-			targetColor = {95, 200, 70};
-			break;
-		case 17:
-			targetColor = {200, 200, 0};
-			break;
-		case 18:
-			targetColor = {225, 180, 0};
-			break;
-		case 19:
-			targetColor = {225, 153, 0};
-			break;
-		case 20:
-			targetColor = {255, 125, 0};
-			break;
-		case 21:
-			targetColor = {255, 100, 0};
-			break;
-		case 22:
-			targetColor = {255, 50, 0};
+		case 15 ... 22:
+			randomizedColor(0.9);
 			break;
 		case 23:
-			targetColor = {255, 0, 0};
+			randomizedColor(0.75);
 			break;
 		default:
 			Serial.println("off"); // 0, 0 , 0
 			targetColor = {0, 0, 0};
 			break;
 	}
+	
+	lastChangedHour = h;
 }
 
 void fadeColor() {
